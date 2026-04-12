@@ -2,6 +2,12 @@
 
 A monorepo of utility packages built with TypeScript and Rolldown.
 
+## Packages
+
+| Package | Description |
+|---------|-------------|
+| [@lib-stack/shared](./packages/shared) | Common utility functions |
+
 ## Getting Started
 
 ### Prerequisites
