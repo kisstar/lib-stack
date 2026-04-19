@@ -47,6 +47,10 @@ lib-stack/
 └── vitest.config.ts        # 根 vitest 配置
 ```
 
+## 工作原则
+
+- 工具函数优先使用 [@lib-stack/shared](./packages/shared/) 包提供的函数，新增工具函数时先在 [@lib-stack/shared](./packages/shared/) 包中添加，再在其他包中使用
+
 ## 详细设计
 
 ### 1. 根目录 package.json
