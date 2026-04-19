@@ -8,6 +8,7 @@ A monorepo of utility packages built with TypeScript and Rolldown.
 |---------|-------------|
 | [@lib-stack/shared](./packages/shared) | Common utility functions |
 | [@lib-stack/logger](./packages/logger) | A lightweight logger with configurable log levels |
+| [@lib-stack/scheduler](./packages/scheduler) | A lightweight task scheduler |
 
 ## Getting Started
 
