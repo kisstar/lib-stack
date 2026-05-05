@@ -18,6 +18,10 @@
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.mts",
   "files": ["dist"],
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/",
+    "access": "public"
+  },
   "scripts": {
     "build": "rolldown -c"
   },

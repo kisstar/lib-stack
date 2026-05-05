@@ -3,6 +3,12 @@
     "target": "ES2022",
     "module": "ESNext",
     "moduleResolution": "bundler",
+    "paths": {
+      "@lib-stack/shared": ["./packages/shared/src/index.ts"],
+      "@lib-stack/logger": ["./packages/logger/src/index.ts"],
+      "@lib-stack/iframe-events": ["./packages/iframe-events/src/index.ts"],
+      "@lib-stack/scheduler": ["./packages/scheduler/src/index.ts"]
+    },
     "resolveJsonModule": true,
     "strict": true,
     "noUncheckedIndexedAccess": true,

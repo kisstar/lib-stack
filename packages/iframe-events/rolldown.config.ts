@@ -14,6 +14,7 @@ export default defineConfig([
       dir: 'dist',
       entryFileNames: '[name].mjs',
       chunkFileNames: '[name].mjs',
+      cleanDir: true,
     },
   },
   {
