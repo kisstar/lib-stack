@@ -1,3 +1,4 @@
+import type { PendingRequest } from './internal'
 import type {
   AppId,
   EventHandler,
@@ -5,16 +6,19 @@ import type {
   IframeAppOptions,
   IframeMessage,
   RequestHandler,
+  RequestOptions,
 } from './types'
 import { createLogger } from '@lib-stack/logger'
+import {
+  buildResponseMessage,
+  executeRequestHandler,
+  postToWindow,
+  rejectAllPending,
+  resolvePending,
+  triggerEventHandlers,
+} from './internal'
 import { createMessage, isIframeMessage } from './protocol'
 import { LocalRouter } from './router'
-
-interface PendingRequest {
-  resolve: (value: unknown) => void
-  reject: (reason: Error) => void
-  timer: ReturnType<typeof setTimeout>
-}
 
 /** 可注入的窗口上下文接口（供测试使用） */
 export interface WinContext {
@@ -40,12 +44,7 @@ export function createHub(options: IframeAppOptions, ctx?: WinContext): IframeAp
   let destroyed = false
 
   function sendTo(target: Window, msg: IframeMessage): void {
-    try {
-      target.postMessage(msg, '*')
-    }
-    catch (err) {
-      logger.warn('postMessage failed', err)
-    }
+    postToWindow(target, msg, err => logger.warn('postMessage failed', err))
   }
 
   function forwardBroadcastToChildren(msg: IframeMessage): void {
@@ -54,65 +53,12 @@ export function createHub(options: IframeAppOptions, ctx?: WinContext): IframeAp
     }
   }
 
-  function triggerEventHandlers(channel: string, payload: unknown, from: AppId): void {
-    const handlers = eventHandlers.get(channel)
-    if (handlers) {
-      for (const handler of handlers) {
-        handler(payload, from)
-      }
-    }
-  }
-
-  function resolvePending(msg: IframeMessage): void {
-    const pending = pendingRequests.get(msg.id)
-    if (!pending)
-      return
-    clearTimeout(pending.timer)
-    pendingRequests.delete(msg.id)
-    if (msg.error) {
-      pending.reject(new Error(msg.error.message))
-    }
-    else {
-      pending.resolve(msg.payload)
-    }
-  }
-
-  async function handleRequest(msg: IframeMessage): Promise<void> {
-    const handler = requestHandlers.get(msg.channel)
-    const replyTo = (payload?: unknown, error?: { message: string }) => {
-      const sourceWin = router.resolveNextHop(msg.source)
-      if (!sourceWin)
-        return
-      sendTo(sourceWin, createMessage({
-        id: msg.id,
-        type: 'response',
-        channel: msg.channel,
-        source: id,
-        target: msg.source,
-        payload,
-        error,
-      }))
-    }
-
-    if (!handler) {
-      replyTo(undefined, { message: `No handler for channel: ${msg.channel}` })
-      return
-    }
-    try {
-      const result = await handler(msg.payload, msg.source)
-      replyTo(result)
-    }
-    catch (err) {
-      replyTo(undefined, { message: err instanceof Error ? err.message : String(err) })
-    }
-  }
-
   function handleMessage(event: MessageEvent): void {
     if (destroyed)
       return
     if (!isIframeMessage(event.data))
       return
-    const msg = event.data as IframeMessage
+    const msg = event.data
 
     logger.debug('received', msg.type, msg.channel, 'from', msg.source)
 
@@ -140,7 +86,7 @@ export function createHub(options: IframeAppOptions, ctx?: WinContext): IframeAp
 
     if (msg.type === 'broadcast') {
       forwardBroadcastToChildren(msg)
-      triggerEventHandlers(msg.channel, msg.payload, msg.source)
+      triggerEventHandlers(eventHandlers, msg.channel, msg.payload, msg.source)
       return
     }
 
@@ -151,13 +97,8 @@ export function createHub(options: IframeAppOptions, ctx?: WinContext): IframeAp
         if (msg.type === 'request') {
           const sourceWin = router.resolveNextHop(msg.source)
           if (sourceWin) {
-            sendTo(sourceWin, createMessage({
-              id: msg.id,
-              type: 'response',
-              channel: msg.channel,
-              source: id,
-              target: msg.source,
-              error: { message: `Target not found: ${msg.target}` },
+            sendTo(sourceWin, buildResponseMessage(id, msg, undefined, {
+              message: `Target not found: ${msg.target}`,
             }))
           }
         }
@@ -168,13 +109,18 @@ export function createHub(options: IframeAppOptions, ctx?: WinContext): IframeAp
     }
 
     if (msg.type === 'response') {
-      resolvePending(msg)
+      resolvePending(pendingRequests, msg)
     }
     else if (msg.type === 'request') {
-      handleRequest(msg)
+      const replyTo = (payload?: unknown, error?: { message: string }) => {
+        const sourceWin = router.resolveNextHop(msg.source)
+        if (sourceWin)
+          sendTo(sourceWin, buildResponseMessage(id, msg, payload, error))
+      }
+      executeRequestHandler(id, msg, requestHandlers, replyTo)
     }
     else if (msg.type === 'event') {
-      triggerEventHandlers(msg.channel, msg.payload, msg.source)
+      triggerEventHandlers(eventHandlers, msg.channel, msg.payload, msg.source)
     }
   }
 
@@ -209,7 +155,7 @@ export function createHub(options: IframeAppOptions, ctx?: WinContext): IframeAp
       target: AppId,
       channel: string,
       payload?: unknown,
-      options?: { timeout?: number },
+      options?: RequestOptions,
     ): Promise<TRes> {
       const { timeout = 5000 } = options ?? {}
       const msg = createMessage({ type: 'request', channel, source: id, target, payload })
@@ -249,7 +195,7 @@ export function createHub(options: IframeAppOptions, ctx?: WinContext): IframeAp
     broadcast(channel: string, payload?: unknown) {
       const msg = createMessage({ type: 'broadcast', channel, source: id, payload })
       forwardBroadcastToChildren(msg)
-      triggerEventHandlers(channel, payload, id)
+      triggerEventHandlers(eventHandlers, channel, payload, id)
     },
 
     ready() {
@@ -259,11 +205,7 @@ export function createHub(options: IframeAppOptions, ctx?: WinContext): IframeAp
     destroy() {
       destroyed = true
       win.removeEventListener('message', handleMessage)
-      for (const [, pending] of pendingRequests) {
-        clearTimeout(pending.timer)
-        pending.reject(new Error('[iframe-events] destroyed'))
-      }
-      pendingRequests.clear()
+      rejectAllPending(pendingRequests, '[iframe-events] destroyed')
       eventHandlers.clear()
       requestHandlers.clear()
     },
