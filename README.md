@@ -46,10 +46,16 @@ pnpm typecheck
 ### Publishing
 
 ```bash
-# Create a changeset
+# 1. Create a changeset to describe your changes
 pnpm changeset
 
-# Publish
+# 2. Bump versions and generate CHANGELOG.md
+pnpm version-packages
+
+# 3. Commit the version changes
+git add . && git commit -m "chore: version packages"
+
+# 4. Build and publish to npm
 pnpm release
 ```
 

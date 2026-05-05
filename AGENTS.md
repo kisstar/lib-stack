@@ -158,12 +158,9 @@ export function isDefined<T>(value: T | undefined | null): value is T {
 - IIFE 格式需要为每个包指定全局变量名（`name` 字段）
 - 子包的 `files` 字段确保只发布 `dist` 目录
 
-## 预期结果
+## 开发命令
 
-- 完整的 monorepo 基础设施，可直接开始开发新工具包
 - 运行 `pnpm install` 安装依赖
 - 运行 `pnpm build` 构建所有子包
 - 运行 `pnpm test` 执行所有测试
 - 运行 `pnpm lint` 校验代码
-- 提交代码时自动 lint 和校验 commit message
-- 通过 changesets 管理版本发布

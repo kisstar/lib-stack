@@ -1,7 +1,7 @@
 {
   "name": "@lib-stack/logger",
   "type": "module",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "exports": {
     ".": {
       "import": {
@@ -17,7 +17,9 @@
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.mts",
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "publishConfig": {
     "registry": "https://registry.npmjs.org/",
     "access": "public"
