@@ -50,6 +50,7 @@ lib-stack/
 ## 工作原则
 
 - 工具函数优先使用 [@lib-stack/shared](./packages/shared/) 包提供的函数，新增工具函数时先在 [@lib-stack/shared](./packages/shared/) 包中添加，再在其他包中使用
+- 修改代码后需要按需更新自身的 README.md 文档和项目的 [README.md](./README.md) 文档
 
 ## 详细设计
 
